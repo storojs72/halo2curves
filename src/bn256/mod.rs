@@ -40,7 +40,7 @@ mod tests {
     use pasta_curves::arithmetic::CurveAffine;
     use rand_core::OsRng;
     use std::mem::swap;
-    use std::ops::{Add, Div, Mul, Neg, Rem, Sub, SubAssign};
+    use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign};
     use subtle::Choice;
 
     #[test]
@@ -64,11 +64,11 @@ mod tests {
     }
 
     fn fq6_swap(fq6: Fq6) -> Fq6 {
-        Fq6::new(fq2_swap(fq6.c0), fq2_swap(fq6.c1), fq2_swap(fq6.c2))
+        Fq6::new(fq2_swap(fq6.c2), fq2_swap(fq6.c1), fq2_swap(fq6.c0))
     }
 
     fn fq12_swap(fq12: Fq12) -> Fq12 {
-        Fq12::new(fq6_swap(fq12.c0), fq6_swap(fq12.c1))
+        Fq12::new(fq6_swap(fq12.c1), fq6_swap(fq12.c0))
     }
 
     fn g2_swap(g2: G2Affine) -> G2Affine {
@@ -125,6 +125,30 @@ mod tests {
     fn rx_x() -> BigInt {
         BigInt::from_str_radix(
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+            10,
+        )
+            .unwrap()
+    }
+
+    fn hx_x() -> BigInt {
+        BigInt::from_str_radix(
+            "552484233613224096312617126783173147097382103762957654188882734314196910839907541213974502761540629817009608548654680343627701153829446747810907373256841551006201639677726139946029199968412598804882391702273019083653272047566316584365559776493027495458238373902875937659943504873220554161550525926302303331747463515644711876653177129578303191095900909191624817826566688241804408081892785725967931714097716709526092261278071952560171111444072049229123565057483750161460024353346284167282452756217662335528813519139808291170539072125381230815729071544861602750936964829313608137325426383735122175229541155376346436093930287402089517426973178917569713384748081827255472576937471496195752727188261435633271238710131736096299798168852925540549342330775279877006784354801422249722573783561685179618816480037695005515426162362431072245638324744480",
+            10,
+        )
+            .unwrap()
+    }
+
+    fn lambdax_x() -> BigInt {
+        BigInt::from_str_radix(
+            "10486551571378427818905133077457505975146652579011797175399169355881771981095211883813744499745558409789005132135496770941292989421431235276221147148858384772096778432243207188878598198850276842458913349817007302752534892127325269",
+            10,
+        )
+            .unwrap()
+    }
+
+    fn mx_x() -> BigInt {
+        BigInt::from_str_radix(
+            "479095176016622842441988045216678740802490611077830385734835461768408136080710527913838926422556221801736192429704607292331370270163904428626529743670357",
             10,
         )
             .unwrap()
@@ -694,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn test_debug() {
+    fn test_development() {
         let mut P1_sage = G1Affine::identity();
         P1_sage.x = bn256::fq::Fq::from_str_vartime(
             "17436239228436682145589725535260983283023841756095494372001414785830786557350",
@@ -1196,5 +1220,380 @@ mod tests {
                 )
             )
         ), actual);
+    }
+
+    fn fq6_negative_of(a: Fq6) -> Fq6 {
+        let mut out = a.clone();
+        out.c0 = fq2_negative_of(a.c0);
+        out.c1 = fq2_negative_of(a.c1);
+        out.c2 = fq2_negative_of(a.c2);
+        out
+    }
+
+    fn fq6_inverse(a: Fq6) -> Fq6 {
+        // Algorithm 17
+
+        let XX = fq2_mul(a.c0, a.c0);
+        let YY = fq2_mul(a.c1, a.c1);
+        let ZZ = fq2_mul(a.c2, a.c2);
+
+        let XY = fq2_mul(a.c0, a.c1);
+        let XZ = fq2_mul(a.c0, a.c2);
+        let YZ = fq2_mul(a.c1, a.c2);
+
+        let A = ZZ - fq2_mul_beta(XY);
+        let B = fq2_mul_beta(XX) - YZ;
+        let C = YY - XZ;
+
+        let mut F = fq2_mul_beta(fq2_mul(C, a.c1));
+        F += fq2_mul(A, a.c2);
+        F += fq2_mul_beta(fq2_mul(B, a.c0));
+        F = fq2_inverse(F);
+
+        let c_x = fq2_mul(C, F);
+        let c_y = fq2_mul(B, F);
+        let c_z = fq2_mul(A, F);
+
+        Fq6::new(c_x, c_y, c_z)
+    }
+
+    fn fq12_inverse(a: Fq12) -> Fq12 {
+        let mut out = a.clone();
+        out.c0 = fq6_negative_of(a.c0);
+
+        let mut t1 = fq6_mul(a.c0, a.c0);
+        let mut t2 = fq6_mul(a.c1, a.c1);
+        t1 = fq6_mul_tau(t1);
+        t1 = t2 - t1;
+        t2 = fq6_inverse(t1);
+
+        out.c0 = fq6_mul(out.c0, t2);
+        out.c1 = fq6_mul(out.c1, t2);
+
+        out
+    }
+
+    // TODO: check if multiplications can be replaced by more efficient square, double, etc.
+    fn fq12_exp(a: Fq12, exp: BigInt) -> Fq12 {
+        let mut e = to_naf(exp);
+        e.reverse();
+        e = e[1..].to_vec();
+
+        let mut R = a.clone();
+        for (i, kb) in e.into_iter().enumerate() {
+            R = fq12_mul(R, R); // square
+
+            if kb == 1 {
+                R = fq12_mul(R, a);
+            } else if kb == -1 {
+                R = fq12_mul(R, fq12_inverse(a));
+            }
+        }
+        R
+    }
+
+    fn rth_root(r: BigInt, r_co: BigInt, f: Fq12) -> Fq12 {
+        assert_eq!(fq12_exp(f, r_co.clone()), fq12_swap(Fq12::one()));
+        let g = r.extended_gcd(&r_co);
+
+        assert_eq!(g.gcd, BigInt::one());
+        let r_inv: BigInt = if g.x.is_negative() {
+            r_co.clone() + g.x
+        } else {
+            g.x
+        };
+        assert_eq!(r.clone().mul(r_inv.clone()).mod_floor(&r_co), BigInt::one());
+
+        let root = fq12_exp(f, r_inv);
+        assert_eq!(fq12_exp(root, r), f);
+
+        root
+    }
+
+    // https://eprint.iacr.org/2009/457.pdf
+    fn tonelli_shanks3(c: Fq12, s: u32, t: BigInt, a: Fq12, k: BigInt) -> Fq12 {
+
+        let s = 3u32;
+
+        /*let mut a = Fq12::new(
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("13314322921470332229863840303322214472521459854557385875251789205491402053108").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("2290605046316568898860729631965352914559655910697611229590655761474732379640").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("4713518240101473287687367608599840570092085817043283304377539078286384685719").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("18603440360517806441782142806801048843191640613686342975402449704215398421154").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("11295606752200895750765496288338437185237282265803129316280218435333896218822").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("15338947814771591729506421293068826711382174002134983294894541757453848934232").unwrap()
+                )
+            ),
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("13293573989308190093997687159810760344528598485341799324341167747682604625469").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("21678088875217410492299751533888306534649862175954787769792380266203414406957").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("17487142711256617983985066726983750991234348345709150406743868780112429181476").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("8125635484343307059662676534583515376304099826722820774845988705788959417531").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("4070971013813623789651314232530244825973199707346935235856027969664466992811").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("19643243440510552388544779023260033637794802256930093553010743350254413240264").unwrap()
+                )
+            )
+        );
+
+        let mut c = Fq12::new(
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                )
+            ),
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("17553528941370670978378477978624452777297851765173151829306895162919936215606").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("17554379422386629800637546590433848251428252778716103150466398261106421020818").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                )
+            )
+        );*/
+
+        //let t = BigInt::from_str_radix("447885521784749526866423445094784254652708800489595493617853543765741605567439947782948857738572356767576690162153643673556300349018761380668940898130147263103843375553851873333155551956616083851567799051563658955417271240000980739913314973594976267001345607027792440175106140955317557264988383256837180236139616513364872580414821818771095442427184844229539201784042770388734547781765673200844321305796286919103541683344410177560890686155486912589408199622398342278827100299202081491133222728396234837498006024313770679627479297638611140785395514134086392269336579074641410288684211319580428619033248671860166898876728604722286922302056017860034991798384231109458465840439308013214414087893536544671949664141406248971632593329219326560808809483450234216694457972409184392140033795792429163146960476466245935914681350236141904037023111691291049300567381293987204498810601030286247539911796321625206002010338323146080", 10).unwrap();
+        let mut r = fq12_exp(a, t.clone());
+        //println!("r");
+        //print_fq12(r);
+
+
+
+
+        // compute cubic root of (a^t)^-1, h
+        let mut h = fq12_swap(Fq12::one());
+        let cc = fq12_exp(c, BigInt::from(3).pow(s - 1));
+        let mut c = fq12_inverse(c);
+        //println!("h");
+        //print_fq12(h);
+        //println!("cc");
+        //print_fq12(cc);
+        //println!("c");
+        //print_fq12(c);
+
+
+        let mut d = Fq12::zero();
+        for i in 1..s {
+            let delta = s - i - 1;
+            let d = fq12_exp(r, BigInt::from(3).pow(delta));
+            if d == cc {
+                h = fq12_mul(h, c);
+                r = fq12_mul(r, fq12_mul(fq12_mul(c, c), c))
+            } else if d == fq12_mul(cc, cc) {
+                h = fq12_mul(h, fq12_mul(c, c));
+                let c3 = fq12_mul(fq12_mul(c, c), c);
+                r = fq12_mul(r, fq12_mul(c3, c3));
+            }
+
+            c = fq12_mul(fq12_mul(c, c), c);
+
+            /*println!("h");
+            print_fq12(h);
+            println!("r");
+            print_fq12(r);
+            println!("c");
+            print_fq12(c);*/
+        }
+
+        r = fq12_exp(a, k.clone());
+        r = fq12_mul(r, h);
+
+        if t == BigInt::from(3).mul(k) + BigInt::one() {
+            r = fq12_inverse(r);
+        }
+
+        assert_eq!(fq12_exp(r, BigInt::from(3)), a);
+        r
+    }
+
+    #[test]
+    fn test_debug() {
+        let f = Fq12::new(
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("14979159024391170005639198452819736466654857283214903755083678356758517136592").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("19179255212017640626421950110077442332223637319173446355334494029062723511588").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("5153843813692294978752855649018278829839715141911891306173539636896001583467").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("882594320831470586023090324556522680111944454995811988621287974399994365236").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("6375494376791364655597588792964347300774889947372301757612904362154190445252").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("7411177602546289276998323564732516132202756502639327046081197595425717358315").unwrap()
+                )
+            ),
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("18537294362773696139452051147056860344601322877763095254369218889185173619948").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("6501301362025914733678307551845740401477962143257795738951827205743710824435").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("2638916684912325257814418923235928592796227957144644709099582618603445099971").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("8497882020477963042360273164135335484186094806658504072297719648400981694791").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("20330300560423193451197480003744561686727292889019608644722757092740994444742").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("16359697216046849917011637578628027695662599966346456216280707466374786375606").unwrap()
+                )
+            )
+        );
+
+        let m = mx_x();
+        let h = hx_x();
+        let p = px_x();
+        let r = rx_x();
+        let lamb = lambdax_x();
+
+        let d = BigInt::gcd(&m, &h);
+
+        let mm = m.div_mod_floor(&d).0;
+
+        let s = 3; // constant
+
+        let p_pow_12_minus_1 = p.pow(12).sub(&BigInt::one());
+        let t = p_pow_12_minus_1.div_mod_floor(&(BigInt::from(3).pow(s))).0;
+        let var_3s_minus_1_mul_t = BigInt::from(3).pow(s - 1).mul(t.clone());
+
+        let k = (t.clone().add(BigInt::one())).div_mod_floor(&BigInt::from(3)).0;
+
+        assert_eq!(r.clone().mul(h.clone()), p_pow_12_minus_1);
+        assert_eq!(m.clone().mul(r.clone()), lamb);
+        assert_eq!(d.clone().mul(mm.clone()), m);
+        assert_eq!(d, BigInt::from(3));
+        assert_ne!(fq12_exp(f, var_3s_minus_1_mul_t.clone()), fq12_swap(Fq12::one()));
+
+        let mut rng = OsRng;
+        let mut z = Fq12::zero();
+        let mut legendre = fq12_swap(Fq12::one());
+
+        // looking for a 'legendre' which is not Fq12::one()
+        loop {
+            z = Fq12::random(&mut rng);
+            legendre = fq12_exp(z, var_3s_minus_1_mul_t.clone());
+            if fq12_swap(Fq12::one()) != legendre {
+                break
+            }
+        }
+
+        let w = fq12_exp(z, t.clone());
+        assert_ne!(w, fq12_swap(Fq12::one()));
+        assert_ne!(fq12_exp(w, var_3s_minus_1_mul_t.clone()), fq12_swap(Fq12::one()));
+        assert_eq!(fq12_exp(w, h.clone()), fq12_swap(Fq12::one()));
+
+        let mut wi = w;
+        if fq12_exp(fq12_mul(f, w), var_3s_minus_1_mul_t.clone()) != fq12_swap(Fq12::one()) {
+            assert_eq!(fq12_exp(fq12_mul(f, fq12_mul(w, w)), var_3s_minus_1_mul_t.clone()), fq12_swap(Fq12::one()));
+            wi = fq12_mul(w, w)
+        }
+
+        let f1 = fq12_mul(f, wi);
+        assert_eq!(fq12_exp(f1, h.clone()), fq12_swap(Fq12::one()));
+
+        let f2 = rth_root(r.clone(), h.clone(), f1);
+        assert_eq!(fq12_exp(f2, r.clone()), f1);
+
+        let f3 = rth_root(mm.clone(), r.clone().mul( h.clone()), f2);
+        assert_eq!(fq12_exp(f3, mm.clone().mul(r.clone())), f1);
+
+        /*
+        let mut w = Fq12::new(
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                )
+            ),
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("9783115122450100638512690547982431507792126166079612669952755732980124836560").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("11338001438479956798774934917208773767173747287567736129812394786879783479299").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("0").unwrap()
+                )
+            )
+        );
+
+        let s = 3;
+        let t = BigInt::from_str_radix("447885521784749526866423445094784254652708800489595493617853543765741605567439947782948857738572356767576690162153643673556300349018761380668940898130147263103843375553851873333155551956616083851567799051563658955417271240000980739913314973594976267001345607027792440175106140955317557264988383256837180236139616513364872580414821818771095442427184844229539201784042770388734547781765673200844321305796286919103541683344410177560890686155486912589408199622398342278827100299202081491133222728396234837498006024313770679627479297638611140785395514134086392269336579074641410288684211319580428619033248671860166898876728604722286922302056017860034991798384231109458465840439308013214414087893536544671949664141406248971632593329219326560808809483450234216694457972409184392140033795792429163146960476466245935914681350236141904037023111691291049300567381293987204498810601030286247539911796321625206002010338323146080", 10).unwrap();
+        let f3  = Fq12::new(
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("1648866315260210807751268197963963902192432706023689959371320220723042617437").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("1317324843177427442938810690887501173194213060729511866032530573374860313053").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("588393338090813009630423773207597035997871585062392625006755238162278328338").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("16580291685980495311622556263864339466500187124496614121224953054735583705848").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("16689391377867953352957735347559469524831128802777125560420919803064767712691").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("15891736238323644362510594155223757161063344402355708728743966129251511304676").unwrap()
+                )
+            ),
+            Fq6::new(
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("16749656838624582171372674368934488250510344472632436341025873443407039900219").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("6638318715978335924870084809794311405894582297392048199811804410209451621085").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("14602141177915938446980038784499596577018828758860585037934155090133990422084").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("6325562690302043603160149709541598198379351057621417735202118224993315130501").unwrap()
+                ),
+                Fq2::new(
+                    bn256::fq::Fq::from_str_vartime("7044478897576179635351813107566546680378434615275423306363865124685808648597").unwrap(),
+                    bn256::fq::Fq::from_str_vartime("6122815482321021227966265792004799310839993987352323782285068077219799156722").unwrap()
+                )
+            )
+        );
+
+        let k = BigInt::from_str_radix("149295173928249842288807815031594751550902933496531831205951181255247201855813315927649619246190785589192230054051214557852100116339587126889646966043382421034614458517950624444385183985538694617189266350521219651805757080000326913304438324531658755667115202342597480058368713651772519088329461085612393412046538837788290860138273939590365147475728281409846400594680923462911515927255224400281440435265428973034513894448136725853630228718495637529802733207466114092942366766400693830377740909465411612499335341437923559875826432546203713595131838044695464089778859691547136762894737106526809539677749557286722299625576201574095640767352005953344997266128077036486155280146436004404804695964512181557316554713802082990544197776406442186936269827816744738898152657469728130713344598597476387715653492155415311971560450078713968012341037230430349766855793764662401499603533676762082513303932107208402000670112774382027", 10).unwrap();
+        */
+
+        let c = tonelli_shanks3(w, s, t, f3, k);
+
+        assert_eq!(d.clone().mul(mm.clone()).mul(r.clone()), lamb);
+        assert_eq!(fq12_exp(c, lamb), fq12_mul(f, wi));
+
+        // c, wi is output
     }
 }
