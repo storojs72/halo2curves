@@ -59,6 +59,8 @@ mod tests {
         assert_eq!(Gt::identity(), mml_res.final_exponentiation());
     }
 
+
+    // swaps
     fn fq2_swap(fq2: Fq2) -> Fq2 {
         Fq2::new(fq2.c1, fq2.c0)
     }
@@ -78,6 +80,9 @@ mod tests {
         g2_copy
     }
 
+
+
+    // printers
     fn print_fq2(fq2: Fq2) {
         println!(
             "{:?}, {:?}",
@@ -110,6 +115,9 @@ mod tests {
         print_fq2(g2.y);
     }
 
+
+
+    // curve parameters
     fn e() -> BigInt {
         BigInt::from_u128(29793968203157093288).unwrap()
     }
@@ -201,6 +209,8 @@ mod tests {
         g2_force_affine(x, y, z)
     }
 
+
+    // functionality
     fn to_naf(x_: BigInt) -> Vec<i32> {
         let mut x = x_.clone();
         let mut z = vec![];
@@ -1179,7 +1189,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_miller_loop() {
+    fn test_multi_miller_loop_sage() {
         let P1 = g1_scalar_mul(g1_sage(), BigInt::from(87i32));
         let P2 = g1_scalar_mul(g1_sage(), BigInt::from(134i32));
 
@@ -1312,90 +1322,12 @@ mod tests {
 
     // https://eprint.iacr.org/2009/457.pdf
     fn tonelli_shanks3(c: Fq12, s: u32, t: BigInt, a: Fq12, k: BigInt) -> Fq12 {
-
-        let s = 3u32;
-
-        /*let mut a = Fq12::new(
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("13314322921470332229863840303322214472521459854557385875251789205491402053108").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("2290605046316568898860729631965352914559655910697611229590655761474732379640").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("4713518240101473287687367608599840570092085817043283304377539078286384685719").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("18603440360517806441782142806801048843191640613686342975402449704215398421154").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("11295606752200895750765496288338437185237282265803129316280218435333896218822").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("15338947814771591729506421293068826711382174002134983294894541757453848934232").unwrap()
-                )
-            ),
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("13293573989308190093997687159810760344528598485341799324341167747682604625469").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("21678088875217410492299751533888306534649862175954787769792380266203414406957").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("17487142711256617983985066726983750991234348345709150406743868780112429181476").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("8125635484343307059662676534583515376304099826722820774845988705788959417531").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("4070971013813623789651314232530244825973199707346935235856027969664466992811").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("19643243440510552388544779023260033637794802256930093553010743350254413240264").unwrap()
-                )
-            )
-        );
-
-        let mut c = Fq12::new(
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                )
-            ),
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("17553528941370670978378477978624452777297851765173151829306895162919936215606").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("17554379422386629800637546590433848251428252778716103150466398261106421020818").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                )
-            )
-        );*/
-
-        //let t = BigInt::from_str_radix("447885521784749526866423445094784254652708800489595493617853543765741605567439947782948857738572356767576690162153643673556300349018761380668940898130147263103843375553851873333155551956616083851567799051563658955417271240000980739913314973594976267001345607027792440175106140955317557264988383256837180236139616513364872580414821818771095442427184844229539201784042770388734547781765673200844321305796286919103541683344410177560890686155486912589408199622398342278827100299202081491133222728396234837498006024313770679627479297638611140785395514134086392269336579074641410288684211319580428619033248671860166898876728604722286922302056017860034991798384231109458465840439308013214414087893536544671949664141406248971632593329219326560808809483450234216694457972409184392140033795792429163146960476466245935914681350236141904037023111691291049300567381293987204498810601030286247539911796321625206002010338323146080", 10).unwrap();
         let mut r = fq12_exp(a, t.clone());
-        //println!("r");
-        //print_fq12(r);
-
-
-
 
         // compute cubic root of (a^t)^-1, h
         let mut h = fq12_swap(Fq12::one());
         let cc = fq12_exp(c, BigInt::from(3).pow(s - 1));
         let mut c = fq12_inverse(c);
-        //println!("h");
-        //print_fq12(h);
-        //println!("cc");
-        //print_fq12(cc);
-        //println!("c");
-        //print_fq12(c);
-
 
         let mut d = Fq12::zero();
         for i in 1..s {
@@ -1411,13 +1343,6 @@ mod tests {
             }
 
             c = fq12_mul(fq12_mul(c, c), c);
-
-            /*println!("h");
-            print_fq12(h);
-            println!("r");
-            print_fq12(r);
-            println!("c");
-            print_fq12(c);*/
         }
 
         r = fq12_exp(a, k.clone());
@@ -1431,48 +1356,17 @@ mod tests {
         r
     }
 
-    #[test]
-    fn test_debug() {
-        let f = Fq12::new(
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("14979159024391170005639198452819736466654857283214903755083678356758517136592").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("19179255212017640626421950110077442332223637319173446355334494029062723511588").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("5153843813692294978752855649018278829839715141911891306173539636896001583467").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("882594320831470586023090324556522680111944454995811988621287974399994365236").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("6375494376791364655597588792964347300774889947372301757612904362154190445252").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("7411177602546289276998323564732516132202756502639327046081197595425717358315").unwrap()
-                )
-            ),
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("18537294362773696139452051147056860344601322877763095254369218889185173619948").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("6501301362025914733678307551845740401477962143257795738951827205743710824435").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("2638916684912325257814418923235928592796227957144644709099582618603445099971").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("8497882020477963042360273164135335484186094806658504072297719648400981694791").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("20330300560423193451197480003744561686727292889019608644722757092740994444742").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("16359697216046849917011637578628027695662599966346456216280707466374786375606").unwrap()
-                )
-            )
-        );
-
+    fn compute_final_exp_witness(f: Fq12) -> (Fq12, Fq12){
         let m = mx_x();
         let h = hx_x();
         let p = px_x();
         let r = rx_x();
-        let lamb = lambdax_x();
 
         let d = BigInt::gcd(&m, &h);
 
         let mm = m.div_mod_floor(&d).0;
+
+        assert_eq!(d.clone().mul(mm.clone()).mul(r.clone()), lambdax_x());
 
         let s = 3; // constant
 
@@ -1483,7 +1377,7 @@ mod tests {
         let k = (t.clone().add(BigInt::one())).div_mod_floor(&BigInt::from(3)).0;
 
         assert_eq!(r.clone().mul(h.clone()), p_pow_12_minus_1);
-        assert_eq!(m.clone().mul(r.clone()), lamb);
+        assert_eq!(m.clone().mul(r.clone()), lambdax_x());
         assert_eq!(d.clone().mul(mm.clone()), m);
         assert_eq!(d, BigInt::from(3));
         assert_ne!(fq12_exp(f, var_3s_minus_1_mul_t.clone()), fq12_swap(Fq12::one()));
@@ -1521,79 +1415,54 @@ mod tests {
         let f3 = rth_root(mm.clone(), r.clone().mul( h.clone()), f2);
         assert_eq!(fq12_exp(f3, mm.clone().mul(r.clone())), f1);
 
-        /*
-        let mut w = Fq12::new(
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                )
-            ),
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("9783115122450100638512690547982431507792126166079612669952755732980124836560").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("11338001438479956798774934917208773767173747287567736129812394786879783479299").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("0").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("0").unwrap()
-                )
-            )
-        );
+        let c= tonelli_shanks3(w, s, t, f3, k);
 
-        let s = 3;
-        let t = BigInt::from_str_radix("447885521784749526866423445094784254652708800489595493617853543765741605567439947782948857738572356767576690162153643673556300349018761380668940898130147263103843375553851873333155551956616083851567799051563658955417271240000980739913314973594976267001345607027792440175106140955317557264988383256837180236139616513364872580414821818771095442427184844229539201784042770388734547781765673200844321305796286919103541683344410177560890686155486912589408199622398342278827100299202081491133222728396234837498006024313770679627479297638611140785395514134086392269336579074641410288684211319580428619033248671860166898876728604722286922302056017860034991798384231109458465840439308013214414087893536544671949664141406248971632593329219326560808809483450234216694457972409184392140033795792429163146960476466245935914681350236141904037023111691291049300567381293987204498810601030286247539911796321625206002010338323146080", 10).unwrap();
-        let f3  = Fq12::new(
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("1648866315260210807751268197963963902192432706023689959371320220723042617437").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("1317324843177427442938810690887501173194213060729511866032530573374860313053").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("588393338090813009630423773207597035997871585062392625006755238162278328338").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("16580291685980495311622556263864339466500187124496614121224953054735583705848").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("16689391377867953352957735347559469524831128802777125560420919803064767712691").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("15891736238323644362510594155223757161063344402355708728743966129251511304676").unwrap()
-                )
-            ),
-            Fq6::new(
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("16749656838624582171372674368934488250510344472632436341025873443407039900219").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("6638318715978335924870084809794311405894582297392048199811804410209451621085").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("14602141177915938446980038784499596577018828758860585037934155090133990422084").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("6325562690302043603160149709541598198379351057621417735202118224993315130501").unwrap()
-                ),
-                Fq2::new(
-                    bn256::fq::Fq::from_str_vartime("7044478897576179635351813107566546680378434615275423306363865124685808648597").unwrap(),
-                    bn256::fq::Fq::from_str_vartime("6122815482321021227966265792004799310839993987352323782285068077219799156722").unwrap()
-                )
-            )
-        );
+        (c, wi)
+    }
 
-        let k = BigInt::from_str_radix("149295173928249842288807815031594751550902933496531831205951181255247201855813315927649619246190785589192230054051214557852100116339587126889646966043382421034614458517950624444385183985538694617189266350521219651805757080000326913304438324531658755667115202342597480058368713651772519088329461085612393412046538837788290860138273939590365147475728281409846400594680923462911515927255224400281440435265428973034513894448136725853630228718495637529802733207466114092942366766400693830377740909465411612499335341437923559875826432546203713595131838044695464089778859691547136762894737106526809539677749557286722299625576201574095640767352005953344997266128077036486155280146436004404804695964512181557316554713802082990544197776406442186936269827816744738898152657469728130713344598597476387715653492155415311971560450078713968012341037230430349766855793764662401499603533676762082513303932107208402000670112774382027", 10).unwrap();
-        */
+    #[test]
+    fn test_pairing_verification_on_sage_input() {
+        // sage input
+        let P1 = g1_scalar_mul(g1_sage(), BigInt::from(176i32));
+        let P2 = g1_scalar_mul(g1_sage(), BigInt::from(19292i32));
 
-        let c = tonelli_shanks3(w, s, t, f3, k);
+        let Q1 = g2_scalar_mul(g2_sage(), BigInt::from(19292i32));
+        let Q2 = g2_negate(g2_scalar_mul(g2_sage(), BigInt::from(176i32)));
 
-        assert_eq!(d.clone().mul(mm.clone()).mul(r.clone()), lamb);
-        assert_eq!(fq12_exp(c, lamb), fq12_mul(f, wi));
+        // canonical pairing verification
+        let mut mml_res = multi_miller_loop(&[(&P1, &g2_swap(Q1)), (&P2, &g2_swap(Q2))]);
+        assert_eq!(Gt::identity(), mml_res.final_exponentiation());
 
-        // c, wi is output
+
+        let L1 = line_function(Q1);
+        let L2 = line_function(Q2);
+
+        // optimized pairing verification
+        let f = multi_miller_loop_sage(&[(&P1, L1), (&P2, L2)]);
+        let (c, wi) = compute_final_exp_witness(f);
+        assert_eq!(fq12_exp(c, lambdax_x()), fq12_mul(f, wi));
+    }
+
+    #[test]
+    fn test_pairing_verification_on_canonical_input() {
+        // canonical input
+        let P1 =  G1Affine::generator();
+        let P2 = -G1Affine::generator();
+
+        let Q1 = G2Affine::generator();
+        let Q2 = G2Affine::generator();
+
+        // canonical pairing verification
+        let mut mml_res = multi_miller_loop(&[(&P1, &Q1), (&P2, &Q2)]);
+        assert_eq!(Gt::identity(), mml_res.final_exponentiation());
+
+
+        let L1 = line_function(g2_swap(Q1));
+        let L2 = line_function(g2_swap(Q2));
+
+        // optimized pairing verification
+        let f = multi_miller_loop_sage(&[(&P1, L1), (&P2, L2)]);
+        let (c, wi) = compute_final_exp_witness(f);
+        assert_eq!(fq12_exp(c, lambdax_x()), fq12_mul(f, wi));
     }
 }
