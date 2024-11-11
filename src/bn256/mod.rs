@@ -25,23 +25,26 @@ pub const SIX_U_PLUS_2_NAF: [i8; 65] = [
 
 #[cfg(test)]
 mod tests {
-    use crate::bn256::{multi_miller_loop, Fq2, Fq6, G1Affine, G2Affine, Gt, BN_X, G1, G2};
+    use crate::bn256::{multi_miller_loop, Fq2, Fq6, G1Affine, G2Affine, Gt, BN_X, G1, G2, SIX_U_PLUS_2_NAF};
     use crate::{bn256, bn256::Fr};
     use bn256::fq::Fq;
     use bn256::fq12::Fq12;
     use ff::{Field, PrimeField};
-    use group::prime::PrimeCurveAffine;
+    //use group::prime::PrimeCurveAffine;
     use group::{Curve, Group};
     use num_bigint::{BigInt, BigUint, ToBigInt};
     use num_integer::{div_floor, Integer};
     use num_traits::real::Real;
     use num_traits::{FromPrimitive, Num, One, Signed, ToPrimitive, Zero};
     use pairing::MillerLoopResult;
-    use pasta_curves::arithmetic::CurveAffine;
+    use pasta_curves::arithmetic::{CurveAffine, CurveExt};
     use rand_core::OsRng;
     use std::mem::swap;
     use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign};
+    //use group::cofactor::CofactorCurveAffine;
+    use group::prime::PrimeCurveAffine;
     use subtle::Choice;
+    use crate::tests::field::arith::inv_test;
 
     #[test]
     fn test_canonical_pairing_example() {
@@ -117,9 +120,42 @@ mod tests {
 
 
 
+
     // curve parameters
+    fn beta() -> Fq2 {
+        Fq2::new(bn256::fq::Fq::from(1), bn256::fq::Fq::from(9))
+    }
+
+    fn fq12_beta_pi_1() -> Vec<Fq2>{
+        let mut out = vec![];
+        for i in 0..5 {
+            out.push(fq2_exp(beta(), BigInt::from(i + 1) * px_x_minus_1().div_mod_floor(&BigInt::from(6)).0));
+        }
+        out
+    }
+
+    fn fq12_beta_pi_2() -> Vec<Fq2>{
+        let mut out = vec![];
+        for i in 0..5 {
+            out.push(fq2_exp(beta(), BigInt::from(i + 1) * (px_x().pow(2).sub(BigInt::one())).div_mod_floor(&BigInt::from(6)).0));
+        }
+        out
+    }
+
+    fn fq12_beta_pi_3() -> Vec<Fq2>{
+        let mut out = vec![];
+        for i in 0..5 {
+            out.push(fq2_exp(beta(), BigInt::from(i + 1) * (px_x().pow(3).sub(BigInt::one())).div_mod_floor(&BigInt::from(6)).0));
+        }
+        out
+    }
+
     fn e() -> BigInt {
         BigInt::from_u128(29793968203157093288).unwrap()
+    }
+
+    fn x() -> BigInt {
+        BigInt::from_u64(BN_X).unwrap()
     }
 
     fn px_x() -> BigInt {
@@ -1302,6 +1338,24 @@ mod tests {
         R
     }
 
+    fn fq2_exp(a: Fq2, exp: BigInt) -> Fq2 {
+        let mut e = to_naf(exp);
+        e.reverse();
+        e = e[1..].to_vec();
+
+        let mut R = a.clone();
+        for (i, kb) in e.into_iter().enumerate() {
+            R = fq2_mul(R, R); // square
+
+            if kb == 1 {
+                R = fq2_mul(R, a);
+            } else if kb == -1 {
+                R = fq2_mul(R, fq2_inverse(a));
+            }
+        }
+        R
+    }
+
     fn rth_root(r: BigInt, r_co: BigInt, f: Fq12) -> Fq12 {
         assert_eq!(fq12_exp(f, r_co.clone()), fq12_swap(Fq12::one()));
         let g = r.extended_gcd(&r_co);
@@ -1465,4 +1519,355 @@ mod tests {
         let (c, wi) = compute_final_exp_witness(f);
         assert_eq!(fq12_exp(c, lambdax_x()), fq12_mul(f, wi));
     }
+
+    #[test]
+    fn test_debug() {
+        // sage input
+        let P1 = g1_scalar_mul(g1_sage(), BigInt::from(87i32));
+        let P2 = g1_scalar_mul(g1_sage(), BigInt::from(134i32));
+
+        let Q1 = g2_scalar_mul(g2_sage(), BigInt::from(134i32));
+        let Q2 = g2_negate(g2_scalar_mul(g2_sage(), BigInt::from(87i32)));
+
+        // canonical verification
+        let mut mml_res = multi_miller_loop(&[(&P1, &g2_swap(Q1)), (&P2, &g2_swap(Q2))]);
+        assert_eq!(Gt::identity(), mml_res.final_exponentiation());
+
+
+        // optimized pairing verification with regular self-written miller loop
+        let f1 = miller_loop(P1, Q1);
+
+
+
+
+        //let (a,b,c,r_out, r_out_projective) = line_func_double(Q1, P1);
+        //print_fq2(a);
+        //let mut a = fq2_swap(a);
+        //a.conjugate();
+        //print_fq2(fq2_swap(a));
+
+        //print_fq2(b);
+        //print_fq2(c);
+        //print_g2(r_out);
+
+        //let (a, b, c, r_out, r_out_projective) = line_func_add(Q1, Q2, P1, a);
+
+
+        //println!();
+        //print_fq2(a);
+        //print_fq2(b);
+        //print_fq2(c);
+        //println!();
+        //print_g2(r_out);
+        //println!();
+        //print_fq2(r_out_projective.x);
+        //print_fq2(r_out_projective.y);
+        //print_fq2(r_out_projective.z);
+
+
+        //let f2 = miller_loop(P2, g2_swap(Q2));
+
+
+
+        //let L1 = line_function(g2_swap(Q1));
+        //let L2 = line_function(g2_swap(Q2));
+        //let f = multi_miller_loop_sage(&[(&P1, L1), (&P2, L2)]);
+        //assert_eq!(fq12_mul(f1, f2), f);
+    }
+
+
+    fn line_func_double(r: G2, q: G1Affine) -> (Fq2, Fq2, Fq2, G2Affine, G2){
+        //let one = Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::one());
+
+        let r_t = fq2_mul(r.z, r.z);
+
+        let A = fq2_mul(r.x, r.x);
+        let B = fq2_mul(r.y, r.y);
+        let C = fq2_mul(B, B);
+        let D = r.x + B;
+        let D = fq2_mul(D, D);
+        let D = D - A;
+        let D = D - C;
+        let D = D + D;
+        let E = A + A + A;
+        let F = fq2_mul(E, E);
+        let C8 = C + C + C + C + C + C + C + C;
+
+        let r_x = F - D - D;
+        let r_y = fq2_mul(E, D - r_x) - C8;
+        let r_z = fq2_mul(r.y + r.z, r.y + r.z) - B - r_t;
+
+        //print_fq2(r_x);
+        //print_fq2(r_y);
+        //print_fq2(r_z);
+
+        assert_eq!(r_z, fq2_mul(r.y, r.z + r.z));
+
+        let mut r_out = g2_force_affine(r_x, r_y, r_z);
+        // we use is_on_curve from halo2curves, so swapping r_out
+        assert_eq!(g2_swap(r_out).is_on_curve().unwrap_u8(), 0x01);
+
+        //println!("r out is on curve");
+
+        let a = r.x + E;
+        let a = fq2_mul(a, a);
+        let tmp = A + F + B + B + B + B;
+        let a = a - tmp;
+
+//        print_fq2(E);
+//        print_fq2(r_t);
+        let t = fq2_mul(E, r_t);
+        let t = t + t;
+        let b = fq2_negative_of(t);
+        let b = fq2_mul_scalar(b, q.x);
+
+        let c = fq2_mul(r_z, r_t);
+        let c = c + c;
+        let c = fq2_mul_scalar(c, q.y);
+
+        let aux_inv = fq2_mul(r_t, r_z);
+        let aux_inv = aux_inv + aux_inv;
+        let aux_inv = fq2_inverse(aux_inv);
+
+        //print_fq2(aux_inv);
+
+        let a = fq2_mul(a, aux_inv);
+        let b = fq2_mul(b, aux_inv);
+        let c = fq2_mul(c, aux_inv);
+
+        let mut projective = G2::identity();
+        projective.x = r_x;
+        projective.y = r_y;
+        projective.z = r_z;
+
+
+        (a, b, c, r_out, projective)
+
+    }
+
+    fn line_func_add(r: G2, p: G2Affine, q: G1Affine, r2: Fq2) -> (Fq2, Fq2, Fq2, G2Affine, G2) {
+        let r_t = fq2_mul(r.z, r.z);
+        let B = fq2_mul(p.x, r_t);
+        let D = p.y + r.z;
+        let D = fq2_mul(D, D);
+        let D = D - r2;
+        let D = D - r_t;
+        let D = fq2_mul(D, r_t);
+
+        let H = B - r.x;
+        let I = fq2_mul(H, H);
+
+        let E = I + I + I + I;
+        let J = fq2_mul(H, E);
+        let L1 = D - r.y;
+        let L1 = L1 - r.y;
+
+        let V = fq2_mul(r.x, E);
+
+        let r_x = fq2_mul(L1, L1);
+        let r_x = r_x - J;
+        let r_x = r_x - V - V;
+
+        let r_z = r.z + H;
+        let r_z = fq2_mul(r_z, r_z);
+        let r_z = r_z - r_t;
+        let r_z = r_z - I;
+
+        let t = V - r_x;
+        let t = fq2_mul(t, L1);
+        let t2 = fq2_mul(r.y, J);
+        let t2 = t2 + t2;
+        let r_y = t - t2;
+
+        print_fq2(r_x);
+        print_fq2(r_y);
+        print_fq2(r_z);
+        //println!();
+
+        let r_out = g2_force_affine(r_x, r_y, r_z);
+
+        let t = p.y + r_z;
+        let t = fq2_mul(t, t);
+        let t = t - r2;
+        let t = t - fq2_mul(r_z, r_z);
+
+        let t2 = fq2_mul(L1, p.x);
+        let t2 = t2 + t2;
+        let a = t2 - t;
+
+        let c = fq2_mul_scalar(r_z, q.y);
+        let c = c + c;
+
+        let b = fq2_negative_of(L1);
+        let b = fq2_mul_scalar(b, q.x);
+        let b = b + b;
+
+        let aux_inv = fq2_inverse(r_z + r_z);
+        let a = fq2_mul(a, aux_inv);
+        let b = fq2_mul(b, aux_inv);
+        let c = fq2_mul(c, aux_inv);
+
+        let mut projective = G2::identity();
+        projective.x = r_x;
+        projective.y = r_y;
+        projective.z = r_z;
+
+        (a, b, c, r_out, projective)
+    }
+
+    fn miller_loop(p: G1Affine, q: G2Affine) -> Fq12 {
+        let mut f = Fq12::new(
+            Fq6::new(
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::zero()),
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::zero()),
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::zero()),
+            ),
+            Fq6::new(
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::zero()),
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::zero()),
+                Fq2::new(bn256::fq::Fq::zero(), bn256::fq::Fq::one()),
+            ),
+        );
+
+
+        //println!("p");
+        //print_g1(p);
+        //println!("q");
+        //print_g2(q);
+
+        let mQ = g2_negate(q);
+        //println!("mQ");
+        //print_g2(mQ);
+
+
+        let mut T = q.clone();
+        let mut T_projective = T.to_curve();
+        T_projective.z = fq2_swap(T_projective.z);
+
+        /*
+        println!("initial T");
+        print_g2(T);
+        println!("initial T projective");
+        print_fq2(T_projective.x);
+        print_fq2(T_projective.y);
+        print_fq2(T_projective.z);*/
+
+
+
+
+        let Qp = fq2_mul(q.y, q.y);
+        //println!("Qp");
+        //print_fq2(Qp);
+
+
+        let mut naf_6xp2 = to_naf(BigInt::from(6u64) * BigInt::from(BN_X) + BigInt::from(2u64));
+        naf_6xp2.reverse();
+        let naf_6xp2 = naf_6xp2[1..].to_vec();
+
+
+        let mut a: Fq2 = Fq2::zero();
+        let mut b: Fq2 = Fq2::zero();
+        let mut c: Fq2 = Fq2::zero();
+
+        //println!("naf_6xp2: {:?}", naf_6xp2);
+
+        for (i, naf_i) in naf_6xp2.into_iter().enumerate() {
+            f = fq12_mul(f, f);
+
+            (a, b, c, T, T_projective) = line_func_double(T_projective, p);
+
+            //if i == 0 || i == 1 || i == 2 {
+            //    print!("T.z: ");
+            //    print_fq2(T_projective.z);
+            //}
+
+            f = fq12_mul_line_base(f, (a, b, c));
+
+            if naf_i == 1 {
+                (a, b, c, T, T_projective) = line_func_add(T_projective, q, p, Qp);
+                f = fq12_mul_line_base(f, (a, b, c));
+            } else if naf_i == -1 {
+                (a, b, c, T, T_projective) = line_func_add(T_projective, mQ, p, Qp);
+                f = fq12_mul_line_base(f, (a, b, c));
+            }
+        }
+        assert_eq!(T, g2_scalar_mul(q, BigInt::from(6u64) * BigInt::from(BN_X) + BigInt::from(2u64)));
+
+        let fq2_one = fq2_swap(Fq2::one());
+
+        let q1_x = fq2_conjugate(q.x);
+        let q1_x = fq2_mul(q1_x, fq12_beta_pi_1()[1].clone());
+        let q1_y = fq2_conjugate(q.y);
+        let q1_y = fq2_mul(q1_y, fq12_beta_pi_1()[2].clone());
+        let q1_z = fq2_one;
+
+        let q1 = g2_force_affine(q1_x, q1_y, q1_z);
+
+        assert_eq!(g2_swap(q1).is_on_curve().unwrap_u8(), 0x01);
+        assert_eq!(q1, g2_scalar_mul(q, px_x()));
+
+        let q2_x = fq2_mul(q.x, fq12_beta_pi_2()[1].clone());
+        let q2_y = fq2_mul(q.y, fq12_beta_pi_2()[2].clone());
+        let q2_z = fq2_one;
+
+        let q2= g2_force_affine(q2_x, q2_y, q2_z);
+
+        assert_eq!(g2_swap(q2).is_on_curve().unwrap_u8(), 0x01);
+        assert_eq!(q2, g2_scalar_mul(q, px_x().pow(2)));
+
+        let q3_x = fq2_conjugate(q.x);
+        let q3_x = fq2_mul(q3_x, fq12_beta_pi_3()[1].clone());
+        let q3_y = fq2_conjugate(q.y);
+        let q3_y = fq2_mul(q3_y, fq12_beta_pi_3()[2].clone());
+        let q3_z = fq2_one;
+
+        let q3 = g2_force_affine(q3_x, q3_y, q3_z);
+
+        assert_eq!(g2_swap(q3).is_on_curve().unwrap_u8(), 0x01);
+        assert_eq!(q3, g2_scalar_mul(q, px_x().pow(3)));
+
+        let Qp = fq2_mul(q1.y, q1.y);
+        (a, b, c, T, T_projective) = line_func_add(T_projective, q1, p, Qp);
+        f = fq12_mul_line_base(f, (a, b, c));
+
+
+        let Qp = fq2_mul(q2.y, q2.y);
+
+        (a, b, c, T, T_projective) = line_func_add(T_projective, g2_negate(q2), p, Qp);
+        f = fq12_mul_line_base(f, (a, b, c));
+
+        let k = BigInt::from(6) * x() + BigInt::from(2) + px_x() - px_x().pow(2);
+
+        if k.gt(&BigInt::zero()) {
+            assert_eq!(T, g2_scalar_mul(q, k));
+        } else {
+            let minus_k = k.neg();
+            let scalar = rx_x() - minus_k.div_mod_floor(&rx_x()).1;
+            assert_eq!(T, g2_scalar_mul(q, scalar));
+        }
+        assert_eq!(T.is_identity().unwrap_u8(), 0x00);
+
+        // TODO: eval
+
+        //let k = BigInt::from(6) * x() + BigInt::from(2) + px_x() - px_x().pow(2) + px_x().pow(3);
+        //assert_eq!(T, g2_scalar_mul(q, k));
+        //assert_eq!(T.is_identity().unwrap_u8(), 0x00);
+
+        //print_fq12(f);
+
+        f
+    }
+
+    fn fq2_conjugate(a: Fq2) -> Fq2 {
+        let mut out = fq2_swap(a.clone());
+        out.conjugate();
+        fq2_swap(out)
+    }
+
+    fn fq12_conjugate(a: Fq12) -> Fq12 {
+        let mut out = fq12_swap(a.clone());
+        out.conjugate();
+        fq12_swap(out)
+    }
+
 }
