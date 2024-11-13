@@ -42,7 +42,7 @@ mod tests {
     use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign};
     use group::prime::PrimeCurveAffine;
     use subtle::Choice;
-    use crate::tests::field::arith::inv_test;
+    use crate::ff_ext::ExtField;
 
     #[test]
     fn test_canonical_pairing_example() {
@@ -648,18 +648,24 @@ mod tests {
     }
 
     fn fq2_mul_beta(a: Fq2) -> Fq2 {
+        fq2_swap(Fq2::mul_by_nonresidue(&fq2_swap(a)))
+
+        /*
         // (beta + y)(3 + i) = 3beta + 3y - x + yi = (3x + y)i + (3y - x)
         let nine = a.c0 + a.c0 + a.c0 + a.c0 + a.c0 + a.c0 + a.c0 + a.c0 + a.c0;
         let tx = nine + a.c1;
         let nine = a.c1 + a.c1 + a.c1 + a.c1 + a.c1 + a.c1 + a.c1 + a.c1 + a.c1;
         let ty = nine - a.c0;
         Fq2::new(tx, ty)
+         */
     }
 
     fn fq6_mul_tau(a: Fq6) -> Fq6 {
         let tx = a.c1;
         let ty = a.c2;
+
         let tz = fq2_mul_beta(a.c0);
+
         Fq6::new(tx, ty, tz)
     }
 
@@ -1487,6 +1493,7 @@ mod tests {
     fn compute_final_exp_witness(f: Fq12) -> (Fq12, Fq12){
         let m = mx_x();
         let h = hx_x();
+        assert_eq!(fq12_exp(f, h.clone()), fq12_swap(Fq12::one()));
         let p = px_x();
         let r = rx_x();
 
