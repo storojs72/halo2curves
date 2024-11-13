@@ -37,7 +37,7 @@ crate::endo!(G2, Fr, ENDO_PARAMS);
 
 #[cfg(test)]
 mod tests {
-    use std::ops::{Add, Mul, Neg, Sub, SubAssign};
+    use std::ops::{Add, Div, Mul, Neg, Sub, SubAssign};
     use ff::{Field, PrimeField};
     use group::{Curve, Group};
     use group::prime::PrimeCurveAffine;
@@ -48,8 +48,10 @@ mod tests {
     use num_traits::real::Real;
     use num_traits::{FromPrimitive, Num, One, Signed, ToPrimitive, Zero};
     use pasta_curves::arithmetic::CurveAffine;
+    use pasta_curves::Fq;
     use rand_core::OsRng;
     use crate::bls12381;
+    use crate::ff_ext::ExtField;
 
     #[test]
     fn test_canonical_pairing_example() {
@@ -120,11 +122,14 @@ mod tests {
         print_fq2(g2.y);
     }
 
+
+
+    // curve / optimisation parameters
     fn x() -> BigInt {
         BigInt::from_i128(-0xd201000000010000).unwrap()
     }
 
-    fn px_x() -> BigInt {
+    fn modulus() -> BigInt {
         BigInt::from_str_radix(
             "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab",
             16,
@@ -132,10 +137,18 @@ mod tests {
             .unwrap()
     }
 
-    fn px_x_minus_1() -> BigInt {
+    fn modulus_minus_one() -> BigInt {
         BigInt::from_str_radix(
             "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaaa",
             16,
+        )
+            .unwrap()
+    }
+
+    fn qx_x() -> BigInt {
+        BigInt::from_str_radix(
+            "793479390729215512464072076108042875612148084278281638540369054903177558538675143759988661420032",
+            10,
         )
             .unwrap()
     }
@@ -148,34 +161,28 @@ mod tests {
             .unwrap()
     }
 
-    // curve parameters
-    // https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bls12-381
-    fn beta() -> Fq2 {
-        Fq2::new(bls12381::fq::Fq::from(1), bls12381::fq::Fq::from(1))
+    fn hx_x() -> BigInt {
+        BigInt::from_str_radix(
+            "1187953094646949460964978789086633769667870913708383532467360559333596611577789496090610146346167525077031903026387460297602145765838579871154117300455841852190629055205186425600590251150517515367911443174768705320573932810930198120802599044705717213480718499961914049370800645289059459984836450604518002989477047170323071258342970036221874890129240095699552337979714210019009615509730638623000191466067385755034978291908382510289449381875044778699119385930236387772922692338048126021229443474326936036965826396020945253945759415758850617310018220324301384943871562440814222536907575606067687182111423556285515824827520364666967830224662633247787077074782720728131656772547794195854262675414567816583080110720835578359169720710074884593917028861514419257932964751212724467326773344978244858101173043370146651784103401701305804523361399056259184066219923820862438873422105479651196757069698007559301663313367301644956596508010228054120661886621909379319031507296096523254415667360258340428512229113253229789201650038514272520862731499154749826274492214922606589068396856344575",
+            10,
+        )
+            .unwrap()
     }
 
-    fn fq12_beta_pi_1() -> Vec<Fq2>{
-        let mut out = vec![];
-        for i in 0..5 {
-            out.push(fq2_exp(beta(), BigInt::from(i + 1) * px_x_minus_1().div_mod_floor(&BigInt::from(6)).0));
-        }
-        out
+    fn lambdax_x() -> BigInt {
+        BigInt::from_str_radix(
+            "4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539",
+            10,
+        )
+            .unwrap()
     }
 
-    fn fq12_beta_pi_2() -> Vec<Fq2>{
-        let mut out = vec![];
-        for i in 0..5 {
-            out.push(fq2_exp(beta(), BigInt::from(i + 1) * (px_x().pow(2).sub(BigInt::one())).div_mod_floor(&BigInt::from(6)).0));
-        }
-        out
-    }
-
-    fn fq12_beta_pi_3() -> Vec<Fq2>{
-        let mut out = vec![];
-        for i in 0..5 {
-            out.push(fq2_exp(beta(), BigInt::from(i + 1) * (px_x().pow(3).sub(BigInt::one())).div_mod_floor(&BigInt::from(6)).0));
-        }
-        out
+    fn mx_x() -> BigInt {
+        BigInt::from_str_radix(
+            "76329603384216526031706109802092473003",
+            10,
+        )
+            .unwrap()
     }
 
     #[test]
@@ -191,7 +198,141 @@ mod tests {
         let mut mml_res = multi_miller_loop(&[(&P1, &Q1), (&P2, &Q2)]);
         assert_eq!(Gt::identity(), mml_res.final_exponentiation());
 
-        miller_loop(P1, g2_swap(Q1));
+        let f1 = miller_loop(P1, g2_swap(Q1));
+        let f2 = miller_loop(P2, g2_swap(Q2));
+        let f = fq12_mul(f1, f2);
+
+        let (c, wi) = compute_final_exp_witness(f);
+    }
+
+
+    fn compute_final_exp_witness(f: Fq12) -> (Fq12, Fq12){
+        let m = mx_x();
+        let h = hx_x();
+
+        // TODO: Why not working? Most likely, either fq12_exp or input f is not correct
+        //assert_eq!(fq12_exp(f, h.clone()), fq12_swap(Fq12::one()));
+
+        let q = qx_x();
+        let r = rx_x();
+        let d = BigInt::gcd(&m, &h);
+
+        let mm = m.div_mod_floor(&d).0;
+
+        assert_eq!(d.clone() * (mm.clone() * r.clone()), lambdax_x());
+
+        // check: r(x) | q(x)^4 − q(x)^2 + 1
+        assert!((modulus().pow(4) - modulus().pow(2) + BigInt::one()).is_multiple_of(&r));
+        assert!((qx_x().pow(4) - qx_x().pow(2) + BigInt::one()).is_multiple_of(&r));
+
+        assert_eq!(m.clone() * r.clone(), lambdax_x());
+
+        let q_pow_12_minus_1 = q.pow(12).sub(&BigInt::one());
+        assert_eq!(r.clone() * h.clone(), q_pow_12_minus_1);
+
+        // check: gcd(λ, q^12 − 1) = d * r = gcd(m, h) * r
+        assert_eq!(BigInt::gcd(&lambdax_x(), &q_pow_12_minus_1), BigInt::from(d.clone()) * r.clone());
+
+        assert_eq!(lambdax_x(), r.clone() * mm.clone() * d.clone());
+
+        // ...
+
+        (Fq12::one(), Fq12::one())
+    }
+
+    // TODO: check if multiplications can be replaced by more efficient square, double, etc.
+    // TODO: find a way to test the correctness
+    fn fq12_exp(a: Fq12, exp: BigInt) -> Fq12 {
+        let mut e = to_naf(exp);
+        e.reverse();
+        e = e[1..].to_vec();
+
+        let mut R = a.clone();
+        for (i, kb) in e.into_iter().enumerate() {
+            R = fq12_mul(R, R); // square
+
+            if kb == 1 {
+                R = fq12_mul(R, a);
+            } else if kb == -1 {
+                R = fq12_mul(R, fq12_inverse(a));
+            }
+        }
+        R
+    }
+    fn fq6_mul_tau(a: Fq6) -> Fq6 {
+        let tx = a.c1;
+        let ty = a.c2;
+        let tz = fq2_mul_beta(a.c0);
+        Fq6::new(tx, ty, tz)
+    }
+
+    fn fq2_mul_beta(a: Fq2) -> Fq2 {
+        // FIXME: probably this function is problematic
+
+        //fq2_swap(Fq2::mul_by_nonresidue(&fq2_swap(a)))
+        let tx = a.c0 + a.c1;
+        let ty = a.c1 - a.c0;
+        Fq2::new(tx, ty)
+
+        /*let out = fq2_swap(a.clone());
+        out.mul_by_nonresidue();
+        fq2_swap(out)*/
+    }
+
+    fn fq12_inverse(a: Fq12) -> Fq12 {
+        let mut out = a.clone();
+        out.c0 = fq6_negative_of(a.c0);
+
+        let mut t1 = fq6_mul(a.c0, a.c0);
+        let mut t2 = fq6_mul(a.c1, a.c1);
+        t1 = fq6_mul_tau(t1);
+        t1 = t2 - t1;
+        t2 = fq6_inverse(t1);
+
+        out.c0 = fq6_mul(out.c0, t2);
+        out.c1 = fq6_mul(out.c1, t2);
+
+        out
+    }
+
+    fn fq6_inverse(a: Fq6) -> Fq6 {
+        // Algorithm 17
+
+        let XX = fq2_mul(a.c0, a.c0);
+        let YY = fq2_mul(a.c1, a.c1);
+        let ZZ = fq2_mul(a.c2, a.c2);
+
+        let XY = fq2_mul(a.c0, a.c1);
+        let XZ = fq2_mul(a.c0, a.c2);
+        let YZ = fq2_mul(a.c1, a.c2);
+
+        let A = ZZ - fq2_mul_beta(XY);
+        let B = fq2_mul_beta(XX) - YZ;
+        let C = YY - XZ;
+
+        let mut F = fq2_mul_beta(fq2_mul(C, a.c1));
+        F += fq2_mul(A, a.c2);
+        F += fq2_mul_beta(fq2_mul(B, a.c0));
+        F = fq2_inverse(F);
+
+        let c_x = fq2_mul(C, F);
+        let c_y = fq2_mul(B, F);
+        let c_z = fq2_mul(A, F);
+
+        Fq6::new(c_x, c_y, c_z)
+    }
+
+    fn fq6_mul(a: Fq6, b: Fq6) -> Fq6 {
+        let out = fq6_swap(a) * fq6_swap(b);
+        fq6_swap(out)
+    }
+
+    fn fq6_negative_of(a: Fq6) -> Fq6 {
+        let mut out = a.clone();
+        out.c0 = fq2_negative_of(a.c0);
+        out.c1 = fq2_negative_of(a.c1);
+        out.c2 = fq2_negative_of(a.c2);
+        out
     }
 
     fn miller_loop(p: G1Affine, q: G2Affine) -> Fq12 {
@@ -219,10 +360,13 @@ mod tests {
         let mut b: Fq2 = Fq2::zero();
         let mut c: Fq2 = Fq2::zero();
 
-        let mut naf = to_naf(x());
+
+        // use negated x as 'to_naf' doesn't support negative values
+        let mut naf = to_naf(x().neg());
         naf.reverse();
         naf = naf[1..].to_vec();
 
+        // TODO: Probably we need BLS_X using instead of naf
         for (i, naf_i) in naf.into_iter().enumerate() {
             f = fq12_mul(f, f);
 
@@ -239,22 +383,10 @@ mod tests {
             }
         }
 
-        assert_eq!(T, g2_scalar_mul(q, BigInt::from(x())));
+        assert_eq!(T, g2_scalar_mul(q, BigInt::from(x().neg())));
 
-        /*let fq2_one = fq2_swap(Fq2::one());
-
-        let q1_x = fq2_conjugate(q.x);
-        let q1_x = fq2_mul(q1_x, fq2_exp(beta(), BigInt::from(i + 1) * px_x_minus_1().div_mod_floor(&BigInt::from(6)).0)););
-        let q1_y = fq2_conjugate(q.y);
-        let q1_y = fq2_mul(q1_y, fq12_beta_pi_1()[2].clone());
-        let q1_z = fq2_one;
-
-        let q1 = g2_force_affine(q1_x, q1_y, q1_z);
-
-        assert_eq!(g2_swap(q1).is_on_curve().unwrap_u8(), 0x01);
-        //assert_eq!(q1, g2_scalar_mul(q, px_x()));*/
-
-        f
+        // since x is negative, we need to conjugate the output
+        fq12_conjugate(f)
     }
 
     // functionality
@@ -264,12 +396,10 @@ mod tests {
         fq2_swap(out)
     }
 
-    fn to_naf(x_: BigInt) -> Vec<i32> {
-        let mut x = if x_.is_positive() {
-            x_.clone()
-        } else {
-            x_.clone().neg()
-        };
+    fn to_naf(x: BigInt) -> Vec<i32> {
+        assert!(x.is_positive());
+
+        let mut x = x.clone();
 
         let mut z = vec![];
 
@@ -390,8 +520,6 @@ mod tests {
     }
 
 
-
-
     fn fq12_mul_line_base(r: Fq12, abc: (Fq2, Fq2, Fq2)) -> Fq12 {
         let fl = Fq12::new(
             Fq6::new(Fq2::zero(), abc.0, abc.1),
@@ -426,7 +554,7 @@ mod tests {
 
     fn fq_additive_inverse(a: bls12381::fq::Fq) -> bls12381::fq::Fq {
         let mod_1 =
-            bls12381::fq::Fq::from_str_vartime(px_x_minus_1().to_str_radix(10).as_str()).unwrap();
+            bls12381::fq::Fq::from_str_vartime(modulus_minus_one().to_str_radix(10).as_str()).unwrap();
         let mut output = mod_1 - a;
         output += bls12381::fq::Fq::one();
         output
@@ -523,7 +651,6 @@ mod tests {
         out.y = y_out;
         out
     }
-
     fn line_func_add(r: G2, p: G2Affine, q: G1Affine, r2: Fq2) -> (Fq2, Fq2, Fq2, G2Affine, G2) {
         let r_t = fq2_mul(r.z, r.z);
         let B = fq2_mul(p.x, r_t);
@@ -593,7 +720,6 @@ mod tests {
 
         (a, b, c, r_out, projective)
     }
-
     fn fq2_exp(a: Fq2, exp: BigInt) -> Fq2 {
         let mut e = to_naf(exp);
         e.reverse();
@@ -610,5 +736,10 @@ mod tests {
             }
         }
         R
+    }
+    fn fq12_conjugate(a: Fq12) -> Fq12 {
+        let mut out = fq12_swap(a.clone());
+        out.conjugate();
+        fq12_swap(out)
     }
 }
