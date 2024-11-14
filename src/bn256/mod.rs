@@ -1887,4 +1887,19 @@ mod tests {
         out.conjugate();
         fq12_swap(out)
     }
+
+    #[test]
+    fn test_fq12_exponentiation_correctness() {
+        let mut rng = OsRng;
+        let exponent = 10;
+        assert!(exponent > 0);
+        let fq12 = Fq12::random(&mut rng);
+        let left = fq12_exp(fq12, BigInt::from(exponent));
+
+        let mut right = fq12.clone();
+        for _ in 0..(exponent - 1) {
+            right = fq12_mul(right, fq12.clone());
+        }
+        assert_eq!(left, right);
+    }
 }

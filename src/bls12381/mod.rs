@@ -129,25 +129,17 @@ mod tests {
         BigInt::from_i128(-0xd201000000010000).unwrap()
     }
 
-    fn modulus() -> BigInt {
-        BigInt::from_str_radix(
-            "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab",
-            16,
-        )
-            .unwrap()
-    }
-
-    fn modulus_minus_one() -> BigInt {
-        BigInt::from_str_radix(
-            "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaaa",
-            16,
-        )
-            .unwrap()
-    }
-
     fn qx_x() -> BigInt {
         BigInt::from_str_radix(
-            "793479390729215512464072076108042875612148084278281638540369054903177558538675143759988661420032",
+            "4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787",
+            10,
+        )
+            .unwrap()
+    }
+
+    fn qx_x_minus_one() -> BigInt {
+        BigInt::from_str_radix(
+            "4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786",
             10,
         )
             .unwrap()
@@ -163,7 +155,7 @@ mod tests {
 
     fn hx_x() -> BigInt {
         BigInt::from_str_radix(
-            "1187953094646949460964978789086633769667870913708383532467360559333596611577789496090610146346167525077031903026387460297602145765838579871154117300455841852190629055205186425600590251150517515367911443174768705320573932810930198120802599044705717213480718499961914049370800645289059459984836450604518002989477047170323071258342970036221874890129240095699552337979714210019009615509730638623000191466067385755034978291908382510289449381875044778699119385930236387772922692338048126021229443474326936036965826396020945253945759415758850617310018220324301384943871562440814222536907575606067687182111423556285515824827520364666967830224662633247787077074782720728131656772547794195854262675414567816583080110720835578359169720710074884593917028861514419257932964751212724467326773344978244858101173043370146651784103401701305804523361399056259184066219923820862438873422105479651196757069698007559301663313367301644956596508010228054120661886621909379319031507296096523254415667360258340428512229113253229789201650038514272520862731499154749826274492214922606589068396856344575",
+            "322277361516934140462891564586510139908379969514828494218366688025288661041104682794998680497580008899973249814104447692778988208376779573819485263026159588510513834876303014016798809919343532899164848730280942609956670917565618115867287399623286813270357901731510188149934363360381614501334086825442271920079363289954510565375378443704372994881406797882676971082200626541916413184642520269678897559532260949334760604962086348898118982248842634379637598665468817769075878555493752214492790122785850202957575200176084204422751485957336465472324810982833638490904279282696134323072515220044451592646885410572234451732790590013479358343841220074174848221722017083597872017638514103174122784843925578370430843522959600095676285723737049438346544753168912974976791528535276317256904336520179281145394686565050419250614107803233314658825463117900250701199181529205942363159325765991819433914303908860460720581408201373164047773794825411011922305820065611121544561808414055302212057471395719432072209245600258134364584636810093520285711072578721435517884103526483832733289802426157301542744476740008494780363354305116978805620671467071400711358839553375340724899735460480144599782014906586543813292157922220645089192130209334926661588737007768565838519456601560804957985667880395221049249803753582637708560",
             10,
         )
             .unwrap()
@@ -171,7 +163,7 @@ mod tests {
 
     fn lambdax_x() -> BigInt {
         BigInt::from_str_radix(
-            "4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539",
+            "-970223322989879234235347398217909883513800123614040636629605779369206487123988021762754806436420539225018110660430574629597272117950833190645132350905828054049340852793006395264263886264819612507783037924218149124701826056046922196945843543463363290689079493037063497864477125563880259435400602850050818969493853842620644220539444087494836928552324610182844026424",
             10,
         )
             .unwrap()
@@ -179,7 +171,7 @@ mod tests {
 
     fn mx_x() -> BigInt {
         BigInt::from_str_radix(
-            "76329603384216526031706109802092473003",
+            "-18503044332711365414904791911389002046454456235902880068437438477414596808076536185222086137936701081884770111977142993511392347341594134320909625744350654635267487273453992200083136256093079477666275889079364852447945068536815482946199946320650919671611689786576455244427459274102574648",
             10,
         )
             .unwrap()
@@ -210,8 +202,7 @@ mod tests {
         let m = mx_x();
         let h = hx_x();
 
-        // TODO: Why not working? Most likely, either fq12_exp or input f is not correct
-        //assert_eq!(fq12_exp(f, h.clone()), fq12_swap(Fq12::one()));
+        assert_eq!(fq12_exp(f, h.clone()), fq12_swap(Fq12::one()));
 
         let q = qx_x();
         let r = rx_x();
@@ -222,7 +213,6 @@ mod tests {
         assert_eq!(d.clone() * (mm.clone() * r.clone()), lambdax_x());
 
         // check: r(x) | q(x)^4 − q(x)^2 + 1
-        assert!((modulus().pow(4) - modulus().pow(2) + BigInt::one()).is_multiple_of(&r));
         assert!((qx_x().pow(4) - qx_x().pow(2) + BigInt::one()).is_multiple_of(&r));
 
         assert_eq!(m.clone() * r.clone(), lambdax_x());
@@ -235,14 +225,113 @@ mod tests {
 
         assert_eq!(lambdax_x(), r.clone() * mm.clone() * d.clone());
 
-        // ...
+        let q_pow_12_minus_1 = qx_x().pow(12).sub(&BigInt::one());
+
+
+        // compute r-th root
+        let f2 = rth_root(r.clone(), h.clone(), f);
+        assert_eq!(fq12_exp(f2, r.clone()), f);
+
+        // compute m'-th root
+        //let f3 = rth_root(mm.clone(), q_pow_12_minus_1.clone(), f2);
+        //assert_eq!(fq12_exp(f3, mm.clone().mul(r.clone())), f);
+
+
+        // We know that f is r-th and m'-residue but it might not be a cubic residue.
+        // Let's check this and if this is the case, we don't need it's scaling
+        if fq12_swap(Fq12::one()) != fq12_exp(f, q_pow_12_minus_1.div_floor(&BigInt::from(3))) {
+            // scaling
+            todo!();
+        }
+
+        // compute cubic root
+        //let c = tonelli_shanks3(f, s, t, c, k);
+
+        //assert_eq!(fq12_exp(c, lambda_x()), f);
 
         (Fq12::one(), Fq12::one())
     }
 
+    fn rth_root(r: BigInt, r_co: BigInt, f: Fq12) -> Fq12 {
+        assert_eq!(fq12_exp(f, r_co.clone()), fq12_swap(Fq12::one()));
+        let g = r.extended_gcd(&r_co);
+
+        assert_eq!(g.gcd, BigInt::one());
+        let r_inv: BigInt = if g.x.is_negative() {
+            r_co.clone() + g.x
+        } else {
+            g.x
+        };
+        assert_eq!(r.clone().mul(r_inv.clone()).mod_floor(&r_co), BigInt::one());
+
+        let root = fq12_exp(f, r_inv);
+        assert_eq!(fq12_exp(root, r), f);
+
+        root
+    }
+
+    /*
+    // https://eprint.iacr.org/2009/457.pdf
+    fn tonelli_shanks3(c: Fq12, s: u32, t: BigInt, a: Fq12, k: BigInt) -> Fq12 {
+        let mut r = fq12_exp(a, t.clone());
+
+        // compute cubic root of (a^t)^-1, h
+        let mut h = fq12_swap(Fq12::one());
+        let cc = fq12_exp(c, BigInt::from(3).pow(s - 1));
+        let mut c = fq12_inverse(c);
+
+        let mut d = Fq12::zero();
+        for i in 1..s {
+            let delta = s - i - 1;
+            let d = fq12_exp(r, BigInt::from(3).pow(delta));
+            if d == cc {
+                h = fq12_mul(h, c);
+                r = fq12_mul(r, fq12_mul(fq12_mul(c, c), c))
+            } else if d == fq12_mul(cc, cc) {
+                h = fq12_mul(h, fq12_mul(c, c));
+                let c3 = fq12_mul(fq12_mul(c, c), c);
+                r = fq12_mul(r, fq12_mul(c3, c3));
+            }
+
+            c = fq12_mul(fq12_mul(c, c), c);
+        }
+
+        r = fq12_exp(a, k.clone());
+        r = fq12_mul(r, h);
+
+        if t == BigInt::from(3).mul(k) + BigInt::one() {
+            r = fq12_inverse(r);
+        }
+
+        assert_eq!(fq12_exp(r, BigInt::from(3)), a);
+        r
+    }*/
+
+
+    #[test]
+    fn test_fq12_exponentiation_correctness() {
+        let mut rng = OsRng;
+        let exponent = 100;
+        assert!(exponent > 0);
+        let fq12 = Fq12::random(&mut rng);
+        let left = fq12_exp(fq12, BigInt::from(exponent));
+
+        let mut right = fq12.clone();
+        for _ in 0..(exponent - 1) {
+            right = fq12_mul(right, fq12.clone());
+        }
+        assert_eq!(left, right);
+    }
+
     // TODO: check if multiplications can be replaced by more efficient square, double, etc.
     // TODO: find a way to test the correctness
-    fn fq12_exp(a: Fq12, exp: BigInt) -> Fq12 {
+    fn fq12_exp(a: Fq12, exp_: BigInt) -> Fq12 {
+        let exp = if exp_.is_negative() {
+            exp_.clone().neg()
+        } else {
+            exp_.clone()
+        };
+
         let mut e = to_naf(exp);
         e.reverse();
         e = e[1..].to_vec();
@@ -257,6 +346,11 @@ mod tests {
                 R = fq12_mul(R, fq12_inverse(a));
             }
         }
+        let R = if exp_.is_negative() {
+            fq12_conjugate(R)
+        } else {
+            R
+        };
         R
     }
     fn fq6_mul_tau(a: Fq6) -> Fq6 {
@@ -267,16 +361,9 @@ mod tests {
     }
 
     fn fq2_mul_beta(a: Fq2) -> Fq2 {
-        // FIXME: probably this function is problematic
-
-        //fq2_swap(Fq2::mul_by_nonresidue(&fq2_swap(a)))
         let tx = a.c0 + a.c1;
         let ty = a.c1 - a.c0;
         Fq2::new(tx, ty)
-
-        /*let out = fq2_swap(a.clone());
-        out.mul_by_nonresidue();
-        fq2_swap(out)*/
     }
 
     fn fq12_inverse(a: Fq12) -> Fq12 {
@@ -554,7 +641,7 @@ mod tests {
 
     fn fq_additive_inverse(a: bls12381::fq::Fq) -> bls12381::fq::Fq {
         let mod_1 =
-            bls12381::fq::Fq::from_str_vartime(modulus_minus_one().to_str_radix(10).as_str()).unwrap();
+            bls12381::fq::Fq::from_str_vartime(qx_x_minus_one().to_str_radix(10).as_str()).unwrap();
         let mut output = mod_1 - a;
         output += bls12381::fq::Fq::one();
         output
